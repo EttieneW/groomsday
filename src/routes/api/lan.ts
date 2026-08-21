@@ -13,7 +13,7 @@ export const Route = createFileRoute("/api/lan")({
         for (const addrs of Object.values(nets)) {
           for (const a of addrs ?? []) {
             if (a.internal) continue;
-            if (a.family !== "IPv4" && a.family !== 4) continue;
+            if (a.family !== "IPv4") continue;
             if (a.address.startsWith("169.254.")) continue;
             const url = `http://${a.address}:8080`;
             if (a.address.startsWith("25.")) hamachi.push(url);

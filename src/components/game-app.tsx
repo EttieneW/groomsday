@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { CampaignBoard } from "@/components/campaign-board";
 import { MissionIntro } from "@/components/mission-intro";
 import { UpgradeScreen } from "@/components/upgrade-screen";
@@ -17,7 +17,7 @@ import { HEROES, HERO_ORDER, type HeroId } from "@/game/constants";
 import { touchState } from "@/game/input";
 import { isNetEvent, isPlayerSnap, isWorldMsg, makeLocalNet } from "@/game/net";
 import type { CreateGameOptions, GameHud, NetBridge, PlayerSnap } from "@/game/types";
-import { useP2PRoom } from "@/lib/multiplayer";
+import { useP2PRoom, type P2PRoomHandle } from "@/lib/multiplayer";
 
 type Screen = "title" | "how" | "select" | "lobby" | "campaign" | "intro" | "play";
 
@@ -127,30 +127,47 @@ export function GameApp() {
           onBack={() => setScreen("title")}
         />
       )}
-      {screen === "intro" && (
+      {!room && screen === "intro" && (
         <MissionIntro missionId={mission} onDone={() => setScreen("play")} />
       )}
-      {screen === "lobby" && room && (
-        <LobbyScreen
-          key={room}
+      {room && (screen === "lobby" || screen === "intro" || screen === "play") && (
+        <SquadFlow
           room={room}
           name={name}
           hero={hero}
-          isHost={isHost}
-          onStart={() => setScreen("intro")}
-          onBack={() => setScreen("select")}
-        />
-      )}
-      {screen === "play" && (
-        <PlayScreen
-          key={`${room}-${hero}-${mission}-${isHost ? "h" : "c"}`}
-          hero={hero}
-          name={name}
-          room={room}
           isHost={isHost}
           mission={mission}
+          setMission={setMission}
+          screen={screen}
+          setScreen={setScreen}
+          save={save}
+          onLeave={() => {
+            setRoom("");
+            setScreen("select");
+          }}
+          onUpgraded={(id) => {
+            const next = completeMission(applyUpgrade(save, id), mission);
+            setSave(next);
+            const nxt = nextPlayableMission(mission);
+            if (nxt) {
+              setMission(nxt);
+              setScreen("intro");
+            } else {
+              setScreen("campaign");
+            }
+          }}
+        />
+      )}
+      {!room && screen === "play" && (
+        <PlayScreen
+          key={`${hero}-${mission}-solo`}
+          hero={hero}
+          name={name}
+          room=""
+          isHost
+          mission={mission}
           upgrades={save.upgrades}
-          onQuit={() => setScreen(room ? "lobby" : "campaign")}
+          onQuit={() => setScreen("campaign")}
           onUpgraded={(id) => {
             const next = completeMission(applyUpgrade(save, id), mission);
             setSave(next);
@@ -165,6 +182,98 @@ export function GameApp() {
         />
       )}
     </div>
+  );
+}
+
+function isLobbyStart(data: unknown): data is { t: "lobby-start"; mission: MissionId } {
+  return Boolean(
+    data &&
+      typeof data === "object" &&
+      (data as { t?: string }).t === "lobby-start" &&
+      typeof (data as { mission?: unknown }).mission === "number",
+  );
+}
+
+function SquadFlow({
+  room,
+  name,
+  hero,
+  isHost,
+  mission,
+  setMission,
+  screen,
+  setScreen,
+  save,
+  onLeave,
+  onUpgraded,
+}: {
+  room: string;
+  name: string;
+  hero: HeroId;
+  isHost: boolean;
+  mission: MissionId;
+  setMission: (id: MissionId) => void;
+  screen: Screen;
+  setScreen: Dispatch<SetStateAction<Screen>>;
+  save: CampaignSave;
+  onLeave: () => void;
+  onUpgraded: (id: UpgradeId) => void;
+}) {
+  const p2p = useP2PRoom({ room, name: `${name}|${hero}` });
+  const started = screen === "intro" || screen === "play";
+  const linked = p2p.peers.filter((p) => p.connectionState === "connected");
+  const peerKey = p2p.peers.map((p) => `${p.id}:${p.connectionState}`).join("|");
+
+  useEffect(() => {
+    return p2p.onMessage((_from, data) => {
+      if (!isLobbyStart(data)) return;
+      setMission(data.mission);
+      setScreen((s) => (s === "lobby" ? "intro" : s));
+    });
+  }, [p2p, setMission, setScreen]);
+
+  useEffect(() => {
+    if (!isHost || !started) return;
+    const payload = { t: "lobby-start" as const, mission };
+    p2p.send(payload);
+    p2p.broadcast(payload);
+  }, [isHost, started, mission, peerKey, p2p]);
+
+  return (
+    <>
+      {screen === "lobby" && (
+        <LobbyScreen
+          room={room}
+          name={name}
+          hero={hero}
+          isHost={isHost}
+          p2p={p2p}
+          canStart={isHost && linked.length > 0}
+          onStart={() => {
+            const payload = { t: "lobby-start" as const, mission };
+            p2p.send(payload);
+            p2p.broadcast(payload);
+            setScreen("intro");
+          }}
+          onBack={onLeave}
+        />
+      )}
+      {screen === "intro" && <MissionIntro missionId={mission} onDone={() => setScreen("play")} />}
+      {screen === "play" && (
+        <PlayScreen
+          key={`${room}-${hero}-${mission}-${isHost ? "h" : "c"}`}
+          hero={hero}
+          name={name}
+          room={room}
+          isHost={isHost}
+          mission={mission}
+          upgrades={save.upgrades}
+          p2p={p2p}
+          onQuit={() => setScreen("lobby")}
+          onUpgraded={onUpgraded}
+        />
+      )}
+    </>
   );
 }
 
@@ -348,7 +457,11 @@ function SelectScreen(props: {
         <button
           type="button"
           onClick={props.onJoin}
-          className="rounded-lg border border-border bg-surface px-5 py-3 font-semibold hover:bg-elevated"
+          className={
+            props.invited || props.joinInput
+              ? "rounded-lg bg-accent px-5 py-3 font-semibold text-accent-fg hover:brightness-110"
+              : "rounded-lg border border-border bg-surface px-5 py-3 font-semibold hover:bg-elevated"
+          }
         >
           Join squad
         </button>
@@ -362,6 +475,8 @@ function LobbyScreen({
   name,
   hero,
   isHost,
+  p2p,
+  canStart,
   onStart,
   onBack,
 }: {
@@ -369,16 +484,18 @@ function LobbyScreen({
   name: string;
   hero: HeroId;
   isHost: boolean;
+  p2p: P2PRoomHandle;
+  canStart: boolean;
   onStart: () => void;
   onBack: () => void;
 }) {
-  const p2p = useP2PRoom({ room, name: `${name}|${hero}` });
   const [copied, setCopied] = useState(false);
   const [lan, setLan] = useState<{ origin: string; hamachi: string[]; urls: string[] } | null>(null);
   const hamachi = lan?.hamachi ?? (lan?.urls ?? []).filter((u) => u.startsWith("http://25."));
   const otherLan = (lan?.urls ?? []).filter((u) => !u.startsWith("http://25."));
-  const localShare = typeof window !== "undefined" ? `${window.location.origin}?room=${room}` : `?room=${room}`;
-  const share = hamachi[0] ? `${hamachi[0]}?room=${room}` : localShare;
+  const withRoom = (origin: string) => `${origin.replace(/\/$/, "")}/?room=${room}`;
+  const localShare = typeof window !== "undefined" ? withRoom(window.location.origin) : `/?room=${room}`;
+  const share = hamachi[0] ? withRoom(hamachi[0]) : localShare;
 
   useEffect(() => {
     void fetch("/api/lan")
@@ -407,7 +524,7 @@ function LobbyScreen({
       <h2 className="mt-2 font-display text-4xl tracking-widest text-bone">{room}</h2>
       <p className="mt-2 text-sm text-muted">
         {p2p.joined
-          ? "Linked. Friends open THIS same page — they should not each host their own server."
+          ? "Linked. Send the Hamachi link. When they show connected, you Start — both drop into the same raid."
           : "Linking the chapel radio…"}
       </p>
       <ul className="mt-6 space-y-2 rounded-xl border border-border bg-surface p-4">
@@ -443,7 +560,7 @@ function LobbyScreen({
           <p className="font-mono text-[11px] uppercase tracking-widest text-muted">Same Wi-Fi</p>
           <ul className="mt-2 space-y-1">
             {otherLan.map((u) => {
-              const href = `${u}?room=${room}`;
+              const href = `${u.replace(/\/$/, "")}/?room=${room}`;
               return (
                 <li key={u}>
                   <button
@@ -463,9 +580,10 @@ function LobbyScreen({
         <button
           type="button"
           onClick={onStart}
-          className="flex-1 rounded-lg bg-accent px-5 py-3.5 font-semibold text-accent-fg"
+          disabled={isHost ? !canStart : true}
+          className="flex-1 rounded-lg bg-accent px-5 py-3.5 font-semibold text-accent-fg disabled:opacity-40"
         >
-          {isHost ? "Start mission" : "Enter chapel"}
+          {isHost ? (canStart ? "Start mission" : "Waiting for squad…") : "Waiting for host…"}
         </button>
         <button
           type="button"
@@ -486,6 +604,7 @@ function PlayScreen({
   isHost,
   mission,
   upgrades,
+  p2p,
   onQuit,
   onUpgraded,
 }: {
@@ -495,18 +614,19 @@ function PlayScreen({
   isHost: boolean;
   mission: MissionId;
   upgrades: CampaignSave["upgrades"];
+  p2p?: P2PRoomHandle;
   onQuit: () => void;
   onUpgraded: (id: UpgradeId) => void;
 }) {
-  if (room) {
+  if (room && p2p) {
     return (
       <OnlinePlay
         hero={hero}
         name={name}
-        room={room}
         isHost={isHost}
         mission={mission}
         upgrades={upgrades}
+        p2p={p2p}
         onQuit={onQuit}
         onUpgraded={onUpgraded}
       />
@@ -556,23 +676,22 @@ function LocalPlay({
 function OnlinePlay({
   hero,
   name,
-  room,
   isHost,
   mission,
   upgrades,
+  p2p,
   onQuit,
   onUpgraded,
 }: {
   hero: HeroId;
   name: string;
-  room: string;
   isHost: boolean;
   mission: MissionId;
   upgrades: CampaignSave["upgrades"];
+  p2p: P2PRoomHandle;
   onQuit: () => void;
   onUpgraded: (id: UpgradeId) => void;
 }) {
-  const p2p = useP2PRoom({ room, name: `${name}|${hero}` });
   const remotes = useRef(new Map<string, PlayerSnap>());
   const p2pRef = useRef(p2p);
   p2pRef.current = p2p;
