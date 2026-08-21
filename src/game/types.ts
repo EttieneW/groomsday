@@ -125,4 +125,5 @@ export type CreateGameOptions = {
   net: NetBridge;
   callbacks: GameCallbacks;
   upgrades?: { speed: number; dmg: number; hp: number; gunnery: number };
+  missionId?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 };

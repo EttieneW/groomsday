@@ -4,7 +4,9 @@ import {
   APEX_GRAVITY,
   APEX_WINDOW,
   COYOTE,
+  CROUCH_BODY_H,
   CROUCH_DISPLAY_H,
+  CROUCH_FEET,
   CROUCH_FRAMES,
   DOUBLE_JUMP_VEL,
   ENEMY_RECOVER,
@@ -15,8 +17,11 @@ import {
   GRAVITY_UP,
   GROUND,
   H,
+  HERO_BODY_H,
+  HERO_BODY_W,
   HERO_DISPLAY_H,
   HERO_DISPLAY_W,
+  HERO_FEET,
   HERO_FRAME,
   HEROES,
   IDLE_FRAMES,
@@ -38,7 +43,7 @@ import {
 } from "../constants";
 import { extraHp, gunneryMul, speedMul, dmgMul, type UpgradeStacks, emptyUpgrades } from "../campaign";
 import { injectKeys, sampleActions } from "../input";
-import { LEVEL } from "../level";
+import { LEVEL, setActiveMission } from "../level";
 import type { CreateGameOptions, EnemySnap, NetEvent, PlayerSnap, ShotSnap, WorldSnap } from "../types";
 
 type KeyObj = Phaser.Input.Keyboard.Key;
@@ -293,12 +298,14 @@ export class PlayScene extends Phaser.Scene {
 
   create() {
     this.options = this.registry.get("options") as CreateGameOptions;
+    setActiveMission(this.options.missionId ?? 1);
     const hero = this.options.hero;
     const stats = HEROES[hero];
     this.upgrades = this.options.upgrades ?? emptyUpgrades();
     this.maxHp = stats.hp + extraHp(this.upgrades);
     this.hp = this.maxHp;
     this.guestMax = LEVEL.pows.length;
+    this.checkpoint = { x: LEVEL.spawn.x, y: LEVEL.spawn.y };
 
     unlockAudio();
     this.input.once("pointerdown", () => unlockAudio());
@@ -442,8 +449,8 @@ export class PlayScene extends Phaser.Scene {
     p.setCollideWorldBounds(false);
     p.setDepth(10);
     const body = p.body as Phaser.Physics.Arcade.Body;
-    body.setSize(78, 168);
-    body.setOffset((HERO_FRAME - 78) / 2, HERO_FRAME - 176);
+    body.setSize(HERO_BODY_W, HERO_BODY_H);
+    body.setOffset((HERO_FRAME - HERO_BODY_W) / 2, HERO_FEET - HERO_BODY_H);
     body.setMaxVelocity(620, MAX_FALL);
     body.setAllowGravity(false);
     body.setDrag(0, 0);
@@ -677,7 +684,7 @@ export class PlayScene extends Phaser.Scene {
     this.hudCoins = this.add.text(W / 2, 16, "", { ...style, fontSize: "20px" }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(50);
     this.hudGun = this.add.text(W - 24, 16, "", { ...style, align: "right" }).setOrigin(1, 0).setScrollFactor(0).setDepth(50);
     this.hudBanner = this.add
-      .text(W / 2, 110, "MISSION 1\nCHAPEL OF THE DAMNED", {
+      .text(W / 2, 110, `MISSION ${this.options.missionId ?? 1}\n${LEVEL.name.toUpperCase()}`, {
         fontFamily: "Alfa Slab One, serif",
         fontSize: "42px",
         color: "#e4d5c0",
@@ -720,7 +727,7 @@ export class PlayScene extends Phaser.Scene {
       banner: this.won ? "win" : this.dead ? "dead" : "play",
       bossHp: this.boss?.alive && this.boss.locked ? this.boss.hp : undefined,
       bossMax: this.boss?.alive && this.boss.locked ? this.boss.max : undefined,
-      bossName: this.boss?.alive && this.boss.locked ? "THE LYCHWING" : undefined,
+      bossName: this.boss?.alive && this.boss.locked ? (LEVEL.boss?.name ?? "BOSS") : undefined,
     });
   }
 
@@ -731,6 +738,8 @@ export class PlayScene extends Phaser.Scene {
       getSpeed: () => Math.abs((scene.player.body as Phaser.Physics.Arcade.Body)?.velocity.x ?? 0),
       getX: () => scene.player?.x ?? 0,
       getY: () => scene.player?.y ?? 0,
+      getLevel: () => LEVEL.name,
+      getMissionId: () => scene.options.missionId ?? 1,
       setKeys: (codes: string[]) => injectKeys(codes),
     };
   }
@@ -790,17 +799,7 @@ export class PlayScene extends Phaser.Scene {
     const stats = HEROES[this.options.hero];
     const blockedDown = body.blocked.down || body.touching.down;
     this.grounded = blockedDown;
-    if (!this.grounded && body.velocity.y >= -50) {
-      const feetY = this.player.y + (this.crouching ? 52 : 70);
-      const px = this.player.x;
-      const onPlat = (obj: Phaser.GameObjects.GameObject) => {
-        const anyObj = obj as unknown as { getBounds?: () => Phaser.Geom.Rectangle };
-        if (typeof anyObj.getBounds !== "function") return false;
-        const b = anyObj.getBounds();
-        return px > b.left - 10 && px < b.right + 10 && Math.abs(feetY - b.top) < 14;
-      };
-      if (this.solids.getChildren().some(onPlat) || this.oneWays.getChildren().some(onPlat)) this.grounded = true;
-    }
+    this.snapToFloor();
     if (this.grounded) {
       this.coyote = COYOTE;
       this.jumpsLeft = 2;
@@ -828,6 +827,7 @@ export class PlayScene extends Phaser.Scene {
 
     this.crouching = this.grounded && actions.down && this.dropT <= 0 && !dropJump;
     this.applyHeroBox();
+    this.snapToFloor();
 
     if (!dropJump && this.buffer > 0 && (this.grounded || this.coyote > 0 || this.jumpsLeft > 0)) {
       const fromGround = this.grounded || this.coyote > 0;
@@ -853,10 +853,14 @@ export class PlayScene extends Phaser.Scene {
       body.velocity.y *= 0.48;
     }
 
-    let g = GRAVITY_DOWN;
-    if (body.velocity.y < 0) g = GRAVITY_UP;
-    if (Math.abs(body.velocity.y) < APEX_WINDOW) g = APEX_GRAVITY;
-    body.velocity.y = Math.min(MAX_FALL, body.velocity.y + g * dt);
+    if (this.grounded) {
+      if (body.velocity.y > 0) body.velocity.y = 0;
+    } else {
+      let g = GRAVITY_DOWN;
+      if (body.velocity.y < 0) g = GRAVITY_UP;
+      if (Math.abs(body.velocity.y) < APEX_WINDOW) g = APEX_GRAVITY;
+      body.velocity.y = Math.min(MAX_FALL, body.velocity.y + g * dt);
+    }
 
     const max = (this.crouching ? stats.speed * 0.38 : stats.speed) * speedMul(this.upgrades);
     if (actions.moveX !== 0) {
@@ -1505,11 +1509,11 @@ export class PlayScene extends Phaser.Scene {
     if (bullet && !bullet.dat?.pierce) this.killBullet(bullet);
     if (this.boss.hp <= this.boss.max * 0.6 && this.boss.phase === 1) {
       this.boss.phase = 2;
-      this.flashBanner("LYCHWING — NAVE LASER");
+      this.flashBanner(`${LEVEL.boss?.name ?? "BOSS"} — PHASE 2`);
     }
     if (this.boss.hp <= this.boss.max * 0.3 && this.boss.phase === 2) {
       this.boss.phase = 3;
-      this.flashBanner("LYCHWING — LAST RITES");
+      this.flashBanner(`${LEVEL.boss?.name ?? "BOSS"} — LAST RITES`);
     }
     if (this.boss.hp <= 0) this.killBoss();
     this.refreshHud();
@@ -1529,7 +1533,7 @@ export class PlayScene extends Phaser.Scene {
       duration: 900,
       onComplete: () => this.boss?.spr.destroy(),
     });
-    this.flashBanner("THE HEARSE IS ALREADY GONE");
+    this.flashBanner(`${LEVEL.boss?.name ?? "BOSS"} FALLS`);
     this.time.delayedCall(1600, () => this.triggerWin());
     this.refreshHud();
   }
@@ -1540,7 +1544,7 @@ export class PlayScene extends Phaser.Scene {
     const arena = LEVEL.boss?.arenaX ?? 11200;
     if (!b.locked && this.player.x > arena) {
       b.locked = true;
-      this.flashBanner("THE LYCHWING");
+      this.flashBanner(LEVEL.boss?.name ?? "BOSS");
     }
     if (!b.locked) return;
     if (this.player.x < arena) this.player.x = arena;
@@ -1655,17 +1659,54 @@ export class PlayScene extends Phaser.Scene {
     const bottom = body.bottom;
     if (this.crouching) {
       this.player.setDisplaySize(HERO_DISPLAY_W, CROUCH_DISPLAY_H);
-      body.setSize(78, 96);
-      body.setOffset((HERO_FRAME - 78) / 2, HERO_FRAME - 104);
+      body.setSize(HERO_BODY_W, CROUCH_BODY_H);
+      body.setOffset((HERO_FRAME - HERO_BODY_W) / 2, CROUCH_FEET - CROUCH_BODY_H);
     } else {
       this.player.setDisplaySize(HERO_DISPLAY_W, HERO_DISPLAY_H);
-      body.setSize(78, 168);
-      body.setOffset((HERO_FRAME - 78) / 2, HERO_FRAME - 176);
+      body.setSize(HERO_BODY_W, HERO_BODY_H);
+      body.setOffset((HERO_FRAME - HERO_BODY_W) / 2, HERO_FEET - HERO_BODY_H);
     }
-    if (this.grounded) {
+    if (body.blocked.down || body.touching.down) {
       this.player.y += bottom - body.bottom;
       if (body.velocity.y > 0) body.velocity.y = 0;
     }
+  }
+
+  snapToFloor() {
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    if (body.velocity.y < -80) return;
+    const gap = this.floorGap(this.solids) ?? this.floorGap(this.oneWays);
+    if (gap == null) return;
+    if (gap < -0.5 && gap > -22) {
+      this.player.y -= gap;
+      if (typeof body.updateFromGameObject === "function") body.updateFromGameObject();
+      else body.y -= gap;
+      body.velocity.y = 0;
+      this.grounded = true;
+      return;
+    }
+    if (gap >= -0.5 && gap < 8) {
+      this.grounded = true;
+      if (body.velocity.y > 0) body.velocity.y = 0;
+    }
+  }
+
+  floorGap(group: Phaser.Physics.Arcade.StaticGroup | null) {
+    if (!group) return null;
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    const px = this.player.x;
+    let best: number | null = null;
+    for (const obj of group.getChildren()) {
+      const anyObj = obj as unknown as { getBounds?: () => Phaser.Geom.Rectangle };
+      if (typeof anyObj.getBounds !== "function") continue;
+      const b = anyObj.getBounds();
+      if (px < b.left - 8 || px > b.right + 8) continue;
+      const gap = body.bottom - b.top;
+      if (gap > -24 && gap < 24) {
+        if (best == null || Math.abs(gap) < Math.abs(best)) best = gap;
+      }
+    }
+    return best;
   }
 
   puff(x: number, y: number, n: number) {
@@ -1836,6 +1877,8 @@ declare global {
       getSpeed: () => number;
       getX: () => number;
       getY: () => number;
+      getLevel?: () => string;
+      getMissionId?: () => number;
       setKeys?: (codes: string[]) => void;
     };
     __playScene?: PlayScene;

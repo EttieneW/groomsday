@@ -26,6 +26,12 @@ export const HERO_FRAME = 256;
 export const HERO_DISPLAY_W = 104;
 export const HERO_DISPLAY_H = 148;
 export const CROUCH_DISPLAY_H = 118;
+/** Opaque foot row in the 256 hero frame (idle). Body bottom sits here so landings do not hover. */
+export const HERO_FEET = 238;
+export const CROUCH_FEET = 244;
+export const HERO_BODY_W = 78;
+export const HERO_BODY_H = 168;
+export const CROUCH_BODY_H = 96;
 export const RUN_FRAMES = 6;
 export const IDLE_FRAMES = 4;
 export const JUMP_FRAMES = 4;

@@ -4,12 +4,12 @@ Co-op Metal Slug-style 2D raid. Four groomsmen chase Ivory Hale after the Hollow
 
 ## Summary
 
-Phaser 3 + TanStack Start run-and-gun. Mission 1 (Chapel of the Damned) is playable: denser chapel, knife/grenades, laser, guests, a parked hearse, and the Lychwing boss. Ten-mission campaign is mapped; 2–10 locked.
+Phaser 3 + TanStack Start run-and-gun. Missions 1–2 are playable (Chapel of the Damned, The Bone Orchard). Clear a mission, pick an upgrade, and the next level loads. Ten-mission campaign is mapped; 3–10 locked.
 
 ## Status
 
 - **Status:** active
-- **Completeness:** 48%
+- **Completeness:** 55%
 - **Last dashboard sync:** 2026-08-21
 
 ## Goals
@@ -21,9 +21,9 @@ Phaser 3 + TanStack Start run-and-gun. Mission 1 (Chapel of the Damned) is playa
 
 ## Next steps
 
-1. Playtest Mission 1 length, Lychwing tells, and J/K/L
+1. Unique Bellwether boss art for Mission 2 (currently reuses Lychwing)
 2. Unique sprites for usher / bomber / priest / gargoyle (currently tinted)
-3. Build Mission 2 — The Bone Orchard
+3. Build Mission 3 — Reception in Hell
 4. Rideable hearse-slug in Mission 3
 5. Hero shoot-body sheets
 

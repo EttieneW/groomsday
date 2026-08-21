@@ -46,6 +46,7 @@ export function MissionIntro({
 
   useEffect(() => {
     lineRef.current?.pause();
+    if (missionId !== 1) return;
     const a = new Audio(`/game/audio/intro-line-${line}.mp3`);
     a.volume = 1;
     lineRef.current = a;
@@ -60,7 +61,7 @@ export function MissionIntro({
       a.src = "";
       if (lineRef.current === a) lineRef.current = null;
     };
-  }, [line]);
+  }, [line, missionId]);
 
   useEffect(() => {
     if (shot < shots.length - 1) {

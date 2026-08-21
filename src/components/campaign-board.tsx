@@ -24,8 +24,8 @@ export function CampaignBoard({
         <img src="/game/portraits/veil-king.png" alt="The Veil King" className="h-28 w-auto rounded-md border border-border object-cover" />
       </div>
       <p className="mt-3 max-w-lg text-sm text-muted">
-        Ten missions. The Veil King dies on the last altar. Only Mission 1 is open steel — the rest of the road is
-        marked.
+        Ten missions. The Veil King dies on the last altar. Clear a mission and the next loads after your upgrade.
+        Missions 1–2 are open steel — the rest of the road is marked.
       </p>
       <ul className="mt-8 space-y-2">
         {MISSIONS.map((m) => {

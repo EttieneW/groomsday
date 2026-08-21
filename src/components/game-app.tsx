@@ -6,7 +6,9 @@ import {
   applyUpgrade,
   completeMission,
   loadCampaign,
+  MISSIONS,
   newCampaign,
+  nextPlayableMission,
   type CampaignSave,
   type MissionId,
   type UpgradeId,
@@ -55,7 +57,6 @@ export function GameApp() {
   const startSolo = () => {
     setIsHost(true);
     setRoom("");
-    setMission(1);
     setScreen("intro");
   };
   const playMission = (id: MissionId) => {
@@ -77,6 +78,7 @@ export function GameApp() {
     setIsHost(false);
     setScreen("lobby");
   };
+  const raidDef = MISSIONS.find((m) => m.id === mission) ?? MISSIONS[0];
 
   return (
     <div className="relative min-h-dvh bg-bg text-fg font-sans">
@@ -92,6 +94,7 @@ export function GameApp() {
       )}
       {screen === "title" && (
         <TitleScreen
+          raidLabel={`${raidDef.code} — ${raidDef.title}`}
           onRaid={() => setScreen("select")}
           onHow={() => setScreen("how")}
           onCampaign={() => setScreen("campaign")}
@@ -117,7 +120,10 @@ export function GameApp() {
         <CampaignBoard
           save={save}
           onPlay={playMission}
-          onNew={() => setSave(newCampaign())}
+          onNew={() => {
+            setSave(newCampaign());
+            setMission(1);
+          }}
           onBack={() => setScreen("title")}
         />
       )}
@@ -137,17 +143,24 @@ export function GameApp() {
       )}
       {screen === "play" && (
         <PlayScreen
-          key={`${room}-${hero}-${isHost ? "h" : "c"}`}
+          key={`${room}-${hero}-${mission}-${isHost ? "h" : "c"}`}
           hero={hero}
           name={name}
           room={room}
           isHost={isHost}
+          mission={mission}
           upgrades={save.upgrades}
           onQuit={() => setScreen(room ? "lobby" : "campaign")}
           onUpgraded={(id) => {
-            const next = applyUpgrade(save, id);
-            setSave(completeMission(next, mission));
-            setScreen("campaign");
+            const next = completeMission(applyUpgrade(save, id), mission);
+            setSave(next);
+            const nxt = nextPlayableMission(mission);
+            if (nxt) {
+              setMission(nxt);
+              setScreen("intro");
+            } else {
+              setScreen("campaign");
+            }
           }}
         />
       )}
@@ -156,10 +169,12 @@ export function GameApp() {
 }
 
 function TitleScreen({
+  raidLabel,
   onRaid,
   onHow,
   onCampaign,
 }: {
+  raidLabel: string;
   onRaid: () => void;
   onHow: () => void;
   onCampaign: () => void;
@@ -183,7 +198,7 @@ function TitleScreen({
           onClick={onRaid}
           className="rounded-lg bg-accent px-6 py-3.5 text-base font-semibold tracking-wide text-accent-fg transition-transform duration-[var(--motion-quick)] hover:brightness-110 active:scale-[0.98]"
         >
-          Mission 1 — Chapel of the Damned
+          {raidLabel}
         </button>
         <button
           type="button"
@@ -467,6 +482,7 @@ function PlayScreen({
   name,
   room,
   isHost,
+  mission,
   upgrades,
   onQuit,
   onUpgraded,
@@ -475,6 +491,7 @@ function PlayScreen({
   name: string;
   room: string;
   isHost: boolean;
+  mission: MissionId;
   upgrades: CampaignSave["upgrades"];
   onQuit: () => void;
   onUpgraded: (id: UpgradeId) => void;
@@ -486,30 +503,52 @@ function PlayScreen({
         name={name}
         room={room}
         isHost={isHost}
+        mission={mission}
         upgrades={upgrades}
         onQuit={onQuit}
         onUpgraded={onUpgraded}
       />
     );
   }
-  return <LocalPlay hero={hero} name={name} upgrades={upgrades} onQuit={onQuit} onUpgraded={onUpgraded} />;
+  return (
+    <LocalPlay
+      hero={hero}
+      name={name}
+      mission={mission}
+      upgrades={upgrades}
+      onQuit={onQuit}
+      onUpgraded={onUpgraded}
+    />
+  );
 }
 
 function LocalPlay({
   hero,
   name,
+  mission,
   upgrades,
   onQuit,
   onUpgraded,
 }: {
   hero: HeroId;
   name: string;
+  mission: MissionId;
   upgrades: CampaignSave["upgrades"];
   onQuit: () => void;
   onUpgraded: (id: UpgradeId) => void;
 }) {
   const net = useMemo(() => makeLocalNet(hero, name), [hero, name]);
-  return <MountedGame hero={hero} name={name} net={net} upgrades={upgrades} onQuit={onQuit} onUpgraded={onUpgraded} />;
+  return (
+    <MountedGame
+      hero={hero}
+      name={name}
+      mission={mission}
+      net={net}
+      upgrades={upgrades}
+      onQuit={onQuit}
+      onUpgraded={onUpgraded}
+    />
+  );
 }
 
 function OnlinePlay({
@@ -517,6 +556,7 @@ function OnlinePlay({
   name,
   room,
   isHost,
+  mission,
   upgrades,
   onQuit,
   onUpgraded,
@@ -525,6 +565,7 @@ function OnlinePlay({
   name: string;
   room: string;
   isHost: boolean;
+  mission: MissionId;
   upgrades: CampaignSave["upgrades"];
   onQuit: () => void;
   onUpgraded: (id: UpgradeId) => void;
@@ -567,13 +608,22 @@ function OnlinePlay({
   }, [net, p2p.selfId]);
 
   return (
-    <MountedGame hero={hero} name={name} net={net} upgrades={upgrades} onQuit={onQuit} onUpgraded={onUpgraded} />
+    <MountedGame
+      hero={hero}
+      name={name}
+      mission={mission}
+      net={net}
+      upgrades={upgrades}
+      onQuit={onQuit}
+      onUpgraded={onUpgraded}
+    />
   );
 }
 
 function MountedGame({
   hero,
   name,
+  mission,
   net,
   upgrades,
   onQuit,
@@ -581,6 +631,7 @@ function MountedGame({
 }: {
   hero: HeroId;
   name: string;
+  mission: MissionId;
   net: NetBridge;
   upgrades: CampaignSave["upgrades"];
   onQuit: () => void;
@@ -608,6 +659,7 @@ function MountedGame({
       playerName: name,
       net,
       upgrades,
+      missionId: mission,
       callbacks: {
         onHud: (h) => setHud(h),
         onWin: (c) => setWin(c),
@@ -629,7 +681,7 @@ function MountedGame({
       gone = true;
       game?.destroy(true);
     };
-  }, [hero, name, net, upgrades]);
+  }, [hero, name, net, upgrades, mission]);
 
   return (
     <div className="flex h-dvh flex-col bg-bg">

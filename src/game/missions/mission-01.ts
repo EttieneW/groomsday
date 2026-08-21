@@ -15,7 +15,7 @@ export const LEVEL: MissionLevel = {
   checkpoints: [],
   pows: [],
   breaks: [],
-  boss: { x: 12480, y: 210, kind: "lychwing", hp: 40, arenaX: 11200 },
+  boss: { x: 12480, y: 210, kind: "lychwing", hp: 40, arenaX: 11200, name: "THE LYCHWING" },
 };
 
 function solid(x: number, y: number, w: number, h = 48): PlatformDef {

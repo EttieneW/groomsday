@@ -57,7 +57,7 @@ export const MISSIONS: MissionDef[] = [
     ],
     boss: "THE BELLWETHER",
     lockedFlavor: "The graves are open. The bell has not rung yet.",
-    playable: false,
+    playable: true,
   },
   {
     id: 3,
@@ -215,6 +215,13 @@ export function completeMission(save: CampaignSave, id: MissionId): CampaignSave
   const next = { ...save, completed, unlocked };
   saveCampaign(next);
   return next;
+}
+
+export function nextPlayableMission(after: MissionId): MissionId | null {
+  const nxt = (after + 1) as MissionId;
+  const m = MISSIONS.find((x) => x.id === nxt);
+  if (m?.playable) return nxt;
+  return null;
 }
 
 export function newCampaign(): CampaignSave {
