@@ -374,14 +374,17 @@ function LobbyScreen({
 }) {
   const p2p = useP2PRoom({ room, name: `${name}|${hero}` });
   const [copied, setCopied] = useState(false);
-  const [lan, setLan] = useState<{ origin: string; urls: string[] } | null>(null);
-  const share = typeof window !== "undefined" ? `${window.location.origin}?room=${room}` : `?room=${room}`;
+  const [lan, setLan] = useState<{ origin: string; hamachi: string[]; urls: string[] } | null>(null);
+  const hamachi = lan?.hamachi ?? (lan?.urls ?? []).filter((u) => u.startsWith("http://25."));
+  const otherLan = (lan?.urls ?? []).filter((u) => !u.startsWith("http://25."));
+  const localShare = typeof window !== "undefined" ? `${window.location.origin}?room=${room}` : `?room=${room}`;
+  const share = hamachi[0] ? `${hamachi[0]}?room=${room}` : localShare;
 
   useEffect(() => {
     void fetch("/api/lan")
       .then((r) => r.json())
-      .then((d: { origin?: string; urls?: string[] }) => {
-        setLan({ origin: d.origin ?? "", urls: d.urls ?? [] });
+      .then((d: { origin?: string; hamachi?: string[]; urls?: string[] }) => {
+        setLan({ origin: d.origin ?? "", hamachi: d.hamachi ?? [], urls: d.urls ?? [] });
       })
       .catch(() => {
         /* ignore */
@@ -397,9 +400,6 @@ function LobbyScreen({
       /* ignore */
     }
   };
-
-  const hamachi = (lan?.urls ?? []).filter((u) => u.startsWith("http://25."));
-  const otherLan = (lan?.urls ?? []).filter((u) => !u.startsWith("http://25."));
 
   return (
     <main className="relative z-10 mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6 py-12">
@@ -427,20 +427,22 @@ function LobbyScreen({
       <button
         type="button"
         onClick={() => copy(share)}
-        className="mt-4 rounded-lg border border-border bg-elevated px-4 py-3 text-sm font-semibold hover:bg-surface"
+        className="mt-4 rounded-lg border border-accent bg-elevated px-4 py-3 text-sm font-semibold hover:bg-surface"
       >
-        {copied ? "Copied" : "Copy squad link"}
+        {copied ? "Copied" : hamachi.length ? "Copy Hamachi link" : "Copy squad link"}
       </button>
-      <p className="mt-2 break-all font-mono text-xs text-subtle">{share}</p>
-      {(hamachi.length > 0 || otherLan.length > 0) && (
+      <p className="mt-2 break-all font-mono text-sm text-bone">{share}</p>
+      {hamachi.length > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          Send that to anyone already in your Hamachi network. They open it in a browser — no extra
+          server. You keep this page running.
+        </p>
+      )}
+      {otherLan.length > 0 && (
         <div className="mt-4 rounded-xl border border-border bg-surface p-4">
-          <p className="font-mono text-[11px] uppercase tracking-widest text-muted">LAN / Hamachi</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            Host keeps this game running. Friends join Hamachi, then open one of these with the room
-            code already on the link.
-          </p>
+          <p className="font-mono text-[11px] uppercase tracking-widest text-muted">Same Wi-Fi</p>
           <ul className="mt-2 space-y-1">
-            {[...hamachi, ...otherLan].map((u) => {
+            {otherLan.map((u) => {
               const href = `${u}?room=${room}`;
               return (
                 <li key={u}>
