@@ -67,10 +67,10 @@ function heroActor(id: HeroId): SpriteActor {
     displayW: HERO_DISPLAY_W,
     displayH: HERO_DISPLAY_H,
     sheets: [
-      sheet(`${id}-idle.png`, "idle", IDLE_FRAMES, 2, 2, 7, true),
-      sheet(`${id}-run.png`, "run", RUN_FRAMES, 3, 2, 14, true),
-      sheet(`${id}-jump.png`, "jump", JUMP_FRAMES, 2, 2, 10, false),
-      sheet(`${id}-crouch.png`, "crouch", CROUCH_FRAMES, 2, 2, 8, true),
+      sheet(`${id}-idle.png`, "idle", IDLE_FRAMES, 2, 2, 4, true),
+      sheet(`${id}-run.png`, "run", RUN_FRAMES, 3, 2, 10, true),
+      sheet(`${id}-jump.png`, "jump", JUMP_FRAMES, 2, 2, 8, false),
+      sheet(`${id}-crouch.png`, "crouch", CROUCH_FRAMES, 2, 2, 6, true),
     ],
   };
 }
@@ -85,7 +85,7 @@ export const SPRITE_ACTORS: SpriteActor[] = [
     displayW: 92,
     displayH: 124,
     sheets: [
-      sheet("skeleton.png", "walk", 4, 2, 2, 9, true),
+      sheet("skeleton.png", "walk", 4, 2, 2, 8, true),
       sheet("skeleton-shoot.png", "shoot", 4, 2, 2, 10, false),
     ],
   },
@@ -97,7 +97,7 @@ export const SPRITE_ACTORS: SpriteActor[] = [
     displayW: 86,
     displayH: 110,
     sheets: [
-      sheet("ghost.png", "walk", 4, 2, 2, 7, true),
+      sheet("ghost.png", "walk", 4, 2, 2, 6, true),
       sheet("ghost-shoot.png", "shoot", 4, 2, 2, 10, false),
     ],
   },

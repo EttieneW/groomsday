@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { INTRO_SHOTS, MISSIONS, type MissionId } from "@/game/campaign";
+import { unlockAudio } from "@/game/audio";
 
 export function MissionIntro({
   missionId,
@@ -14,11 +15,52 @@ export function MissionIntro({
   const [line, setLine] = useState(0);
   const [shown, setShown] = useState("");
   const [canSkip, setCanSkip] = useState(false);
+  const bedRef = useRef<HTMLAudioElement | null>(null);
+  const lineRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setCanSkip(true), 700);
     return () => window.clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    unlockAudio();
+    const bed = new Audio("/game/audio/intro-tension.mp3");
+    bed.loop = true;
+    bed.volume = 0.38;
+    bedRef.current = bed;
+    const kick = () => {
+      void bed.play().catch(() => {});
+    };
+    kick();
+    window.addEventListener("pointerdown", kick);
+    window.addEventListener("keydown", kick);
+    return () => {
+      window.removeEventListener("pointerdown", kick);
+      window.removeEventListener("keydown", kick);
+      bed.pause();
+      bed.src = "";
+      bedRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    lineRef.current?.pause();
+    const a = new Audio(`/game/audio/intro-line-${line}.mp3`);
+    a.volume = 1;
+    lineRef.current = a;
+    const play = () => {
+      void a.play().catch(() => {});
+    };
+    play();
+    window.addEventListener("pointerdown", play, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", play);
+      a.pause();
+      a.src = "";
+      if (lineRef.current === a) lineRef.current = null;
+    };
+  }, [line]);
 
   useEffect(() => {
     if (shot < shots.length - 1) {

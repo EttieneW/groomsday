@@ -71,6 +71,7 @@ type EnemyObj = {
   modeT: number;
   short: boolean;
   armored?: boolean;
+  faceT: number;
 };
 
 type PowObj = { id: number; spr: Phaser.Physics.Arcade.Sprite; taken: boolean; drop: "grenade" | "rings" };
@@ -340,14 +341,19 @@ export class PlayScene extends Phaser.Scene {
       });
     };
     for (const h of ["lens", "goldie", "bear", "stache"] as HeroId[]) {
-      mk(`${h}-idle`, `${h}-idle`, IDLE_FRAMES, 7, -1);
-      mk(`${h}-run`, `${h}-run`, RUN_FRAMES, 14, -1);
-      mk(`${h}-jump`, `${h}-jump`, JUMP_FRAMES, 10, 0);
-      mk(`${h}-crouch`, `${h}-crouch`, CROUCH_FRAMES, 8, -1);
+      for (const k of [`${h}-idle`, `${h}-run`, `${h}-jump`, `${h}-crouch`]) {
+        if (this.anims.exists(k)) this.anims.remove(k);
+      }
+      mk(`${h}-idle`, `${h}-idle`, IDLE_FRAMES, 4, -1);
+      mk(`${h}-run`, `${h}-run`, RUN_FRAMES, 10, -1);
+      mk(`${h}-jump`, `${h}-jump`, JUMP_FRAMES, 8, 0);
+      mk(`${h}-crouch`, `${h}-crouch`, CROUCH_FRAMES, 6, -1);
     }
-    mk("skeleton", "skeleton", 4, 9, -1);
+    if (this.anims.exists("skeleton")) this.anims.remove("skeleton");
+    mk("skeleton", "skeleton", 4, 8, -1);
     mk("skeleton-shoot", "skeleton-shoot", 4, 10, 0);
-    mk("ghost", "ghost", 4, 7, -1);
+    if (this.anims.exists("ghost")) this.anims.remove("ghost");
+    mk("ghost", "ghost", 4, 6, -1);
     mk("ghost-shoot", "ghost-shoot", 4, 10, 0);
     mk("bat", "bat", 4, 10, -1);
     mk("explode", "explode", 4, 14, 0);
@@ -538,6 +544,7 @@ export class PlayScene extends Phaser.Scene {
         modeT: 0,
         short,
         armored: e.kind === "usher" || e.kind === "hearse",
+        faceT: 0,
       });
     });
   }
@@ -783,6 +790,17 @@ export class PlayScene extends Phaser.Scene {
     const stats = HEROES[this.options.hero];
     const blockedDown = body.blocked.down || body.touching.down;
     this.grounded = blockedDown;
+    if (!this.grounded && body.velocity.y >= -50) {
+      const feetY = this.player.y + (this.crouching ? 52 : 70);
+      const px = this.player.x;
+      const onPlat = (obj: Phaser.GameObjects.GameObject) => {
+        const anyObj = obj as unknown as { getBounds?: () => Phaser.Geom.Rectangle };
+        if (typeof anyObj.getBounds !== "function") return false;
+        const b = anyObj.getBounds();
+        return px > b.left - 10 && px < b.right + 10 && Math.abs(feetY - b.top) < 14;
+      };
+      if (this.solids.getChildren().some(onPlat) || this.oneWays.getChildren().some(onPlat)) this.grounded = true;
+    }
     if (this.grounded) {
       this.coyote = COYOTE;
       this.jumpsLeft = 2;
@@ -1014,6 +1032,7 @@ export class PlayScene extends Phaser.Scene {
       e.phase += dt;
       e.shootT -= dt;
       e.modeT = Math.max(0, e.modeT - dt);
+      e.faceT = Math.max(0, e.faceT - dt);
 
       if (e.mode === "windup") {
         body.setVelocity(0, 0);
@@ -1056,17 +1075,17 @@ export class PlayScene extends Phaser.Scene {
       }
 
       if (e.kind === "skeleton" || e.kind === "usher") {
-        if (Math.abs(s.x - e.homeX) > e.patrol) e.facing *= -1;
+        this.patrolFacing(e);
         body.setVelocity((e.kind === "usher" ? 32 : 55) * e.facing, 0);
         s.setFlipX(e.facing < 0);
         if (s.anims.currentAnim?.key !== "skeleton") s.play("skeleton", true);
-        if (!e.short && e.shootT <= 0 && Math.abs(s.x - px) < 460 && Math.abs(s.y - py) < 140) {
+        const ahead = (px - s.x) * e.facing > 50;
+        if (!e.short && e.shootT <= 0 && ahead && Math.abs(s.x - px) < 460 && Math.abs(s.y - py) < 140) {
           this.beginWindup(e, px);
         }
         if (this.physics.world.overlap(this.player, s)) this.hurt(1);
       } else if (e.kind === "bomber") {
-        const dir = Math.sign(px - s.x) || e.facing;
-        e.facing = dir >= 0 ? 1 : -1;
+        this.faceToward(e, px, 36);
         s.setFlipX(e.facing < 0);
         body.setVelocity(140 * e.facing, 0);
         const pulse = 0.55 + 0.45 * Math.sin(e.phase * 8);
@@ -1080,8 +1099,8 @@ export class PlayScene extends Phaser.Scene {
       } else if (e.kind === "ghost" || e.kind === "priest") {
         const dx = px - s.x;
         const dy = py - 30 - s.y;
-        e.facing = dx >= 0 ? 1 : -1;
-        body.setVelocity(Math.sign(dx) * (e.kind === "priest" ? 22 : 40), Math.sin(e.phase * 2) * 30 + Math.sign(dy) * 22);
+        this.faceToward(e, px, 48);
+        body.setVelocity(Math.sign(dx || e.facing) * (e.kind === "priest" ? 22 : 40), Math.sin(e.phase * 2) * 30 + Math.sign(dy) * 22);
         s.setFlipX(e.facing < 0);
         if (s.anims.currentAnim?.key !== "ghost") s.play("ghost", true);
         if (this.physics.world.overlap(this.player, s)) this.hurt(1);
@@ -1096,18 +1115,40 @@ export class PlayScene extends Phaser.Scene {
         if (this.physics.world.overlap(this.player, s)) this.hurt(1);
       } else {
         body.setVelocity(Math.sin(e.phase * 1.4) * 90, Math.cos(e.phase * 2.1) * 50);
-        s.setFlipX(body.velocity.x < 0);
+        s.setFlipX(e.facing < 0);
         if (this.physics.world.overlap(this.player, s)) this.hurt(1);
       }
       this.hitEnemyWithBullets(e);
     }
   }
 
+  patrolFacing(e: EnemyObj) {
+    const x = e.sprite.x;
+    if (x > e.homeX + e.patrol && e.facing === 1) this.setFacing(e, -1, 0.35);
+    else if (x < e.homeX - e.patrol && e.facing === -1) this.setFacing(e, 1, 0.35);
+  }
+
+  faceToward(e: EnemyObj, tx: number, deadzone: number) {
+    const dx = tx - e.sprite.x;
+    if (dx > deadzone) this.setFacing(e, 1, 0.4);
+    else if (dx < -deadzone) this.setFacing(e, -1, 0.4);
+  }
+
+  setFacing(e: EnemyObj, dir: 1 | -1, lock: number) {
+    if (dir === e.facing) return;
+    if (e.faceT > 0) return;
+    e.facing = dir;
+    e.faceT = lock;
+  }
+
   beginWindup(e: EnemyObj, px: number) {
     e.mode = "windup";
     e.modeT = ENEMY_WINDUP;
     e.shootT = e.kind === "ghost" || e.kind === "priest" ? 2.2 : e.kind === "hearse" ? 2.6 : 1.7 + Math.random() * 0.7;
-    e.facing = px >= e.sprite.x ? 1 : -1;
+    if (e.kind === "ghost" || e.kind === "priest" || e.kind === "gargoyle" || e.kind === "hearse") {
+      e.facing = px >= e.sprite.x ? 1 : -1;
+      e.faceT = 0.55;
+    }
     e.sprite.setFlipX(e.facing < 0);
     const key = e.kind === "ghost" || e.kind === "priest" ? "ghost-shoot" : "skeleton-shoot";
     if (this.anims.exists(key)) e.sprite.play(key, true);
