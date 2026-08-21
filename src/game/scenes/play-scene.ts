@@ -4,6 +4,7 @@ import {
   APEX_GRAVITY,
   APEX_WINDOW,
   COYOTE,
+  CROUCH_DISPLAY_H,
   CROUCH_FRAMES,
   DOUBLE_JUMP_VEL,
   ENEMY_RECOVER,
@@ -710,15 +711,21 @@ export class PlayScene extends Phaser.Scene {
     if (this.crouching) {
       const want = `${hero}-crouch`;
       if (this.player.anims.currentAnim?.key !== want) this.player.play(want, true);
-    } else if (!this.grounded) {
-      const want = `${hero}-jump`;
-      if (this.player.anims.currentAnim?.key !== want) this.player.play(want, true);
-    } else if (Math.abs(body.velocity.x) > 40) {
-      const want = `${hero}-run`;
-      if (this.player.anims.currentAnim?.key !== want) this.player.play(want, true);
-    } else if (this.player.anims.currentAnim?.key !== `${hero}-idle`) {
-      this.player.play(`${hero}-idle`, true);
-      this.lastRunFrame = -1;
+      this.player.setDisplaySize(HERO_DISPLAY_W, CROUCH_DISPLAY_H);
+    } else {
+      if (Math.abs(this.player.displayHeight - CROUCH_DISPLAY_H) < 2) {
+        this.player.setDisplaySize(HERO_DISPLAY_W, HERO_DISPLAY_H);
+      }
+      if (!this.grounded) {
+        const want = `${hero}-jump`;
+        if (this.player.anims.currentAnim?.key !== want) this.player.play(want, true);
+      } else if (Math.abs(body.velocity.x) > 40) {
+        const want = `${hero}-run`;
+        if (this.player.anims.currentAnim?.key !== want) this.player.play(want, true);
+      } else if (this.player.anims.currentAnim?.key !== `${hero}-idle`) {
+        this.player.play(`${hero}-idle`, true);
+        this.lastRunFrame = -1;
+      }
     }
 
     if (this.invuln > 0) this.player.setAlpha(0.45 + 0.55 * Math.sin(this.invuln * 28));
@@ -1218,6 +1225,8 @@ export class PlayScene extends Phaser.Scene {
       spr.x = Phaser.Math.Linear(spr.x, snap.x, 0.4);
       spr.y = Phaser.Math.Linear(spr.y, snap.y, 0.4);
       spr.setFlipX(snap.facing < 0);
+      if (snap.anim.endsWith("-crouch")) spr.setDisplaySize(HERO_DISPLAY_W, CROUCH_DISPLAY_H);
+      else if (spr.displayHeight !== HERO_DISPLAY_H) spr.setDisplaySize(HERO_DISPLAY_W, HERO_DISPLAY_H);
       if (spr.anims.currentAnim?.key !== snap.anim) {
         try {
           spr.play(snap.anim, true);
