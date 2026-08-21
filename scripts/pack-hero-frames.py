@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Pack single-character magenta frames into Phaser 256px sheets. Key magenta only — never dark faces."""
+"""Pack single-character magenta frames into Phaser 256px sheets. Key magenta only — never dark faces.
+
+After packing, open http://localhost:8080/sprites and run `npm run test:sprites`.
+"""
 from __future__ import annotations
 
 from pathlib import Path

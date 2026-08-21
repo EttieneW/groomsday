@@ -203,6 +203,9 @@ function TitleScreen({
       <p className="mt-10 font-mono text-xs uppercase tracking-widest text-subtle">
         1–4 players · J fire · K knife · L grenade
       </p>
+      <a href="/sprites" className="mt-6 font-mono text-[11px] uppercase tracking-widest text-subtle hover:text-bone">
+        Sprite lab
+      </a>
     </main>
   );
 }

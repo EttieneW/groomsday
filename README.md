@@ -42,6 +42,8 @@ Useful scripts:
 - `npm run dev` — game on `0.0.0.0:8080`
 - `npm run build` — production build
 - `npm run typecheck`
+- `npm run test:sprites` — sheet size / empty cells / magenta / missing faces
+- Sprite lab (visual): http://localhost:8080/sprites
 
 ## Controls
 

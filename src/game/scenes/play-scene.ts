@@ -217,7 +217,7 @@ export class PlayScene extends Phaser.Scene {
   preload() {
     const bar = this.add.rectangle(W / 2, H / 2, 320, 8, 0x3a2828).setScrollFactor(0);
     const fill = this.add.rectangle(W / 2 - 160, H / 2, 4, 8, 0x8b1e3d).setOrigin(0, 0.5).setScrollFactor(0);
-    this.add
+    const loadLabel = this.add
       .text(W / 2, H / 2 - 28, "LOADING RAID", {
         fontFamily: "Share Tech Mono, monospace",
         fontSize: "14px",
@@ -229,12 +229,7 @@ export class PlayScene extends Phaser.Scene {
       fill.width = 320 * v;
     });
     this.load.once("complete", () => {
-      this.children.getAll().forEach((obj) => {
-        if ("scrollFactorX" in obj && (obj as Phaser.GameObjects.Components.ScrollFactor).scrollFactorX === 0) {
-          const txt = obj as Phaser.GameObjects.Text;
-          if (txt.text === "LOADING RAID") obj.destroy();
-        }
-      });
+      loadLabel.destroy();
       bar.destroy();
       fill.destroy();
     });

@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SpritesRouteImport } from './routes/sprites'
 import { Route as ApiLanRouteImport } from './routes/api/lan'
 import { Route as ApiRtcRouteImport } from './routes/api/rtc'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SpritesRoute = SpritesRouteImport.update({
+  id: '/sprites',
+  path: '/sprites',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLanRoute = ApiLanRouteImport.update({
@@ -31,30 +37,34 @@ const ApiRtcRoute = ApiRtcRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/sprites': typeof SpritesRoute
   '/api/lan': typeof ApiLanRoute
   '/api/rtc': typeof ApiRtcRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/sprites': typeof SpritesRoute
   '/api/lan': typeof ApiLanRoute
   '/api/rtc': typeof ApiRtcRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/sprites': typeof SpritesRoute
   '/api/lan': typeof ApiLanRoute
   '/api/rtc': typeof ApiRtcRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/lan' | '/api/rtc'
+  fullPaths: '/' | '/sprites' | '/api/lan' | '/api/rtc'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/lan' | '/api/rtc'
-  id: '__root__' | '/' | '/api/lan' | '/api/rtc'
+  to: '/' | '/sprites' | '/api/lan' | '/api/rtc'
+  id: '__root__' | '/' | '/sprites' | '/api/lan' | '/api/rtc'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SpritesRoute: typeof SpritesRoute
   ApiLanRoute: typeof ApiLanRoute
   ApiRtcRoute: typeof ApiRtcRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sprites': {
+      id: '/sprites'
+      path: '/sprites'
+      fullPath: '/sprites'
+      preLoaderRoute: typeof SpritesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/lan': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SpritesRoute: SpritesRoute,
   ApiLanRoute: ApiLanRoute,
   ApiRtcRoute: ApiRtcRoute,
 }
