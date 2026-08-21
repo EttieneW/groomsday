@@ -814,7 +814,9 @@ export class PlayScene extends Phaser.Scene {
     }
     this.wasGrounded = this.grounded;
 
-    const dropJump = actions.down && actions.jumpPressed && this.grounded;
+    const onSolidFloor = this.standingOn(this.solids);
+    const onThinLedge = this.standingOn(this.oneWays);
+    const dropJump = actions.down && actions.jumpPressed && this.grounded && onThinLedge && !onSolidFloor;
     if (dropJump) {
       this.dropT = 0.28;
       this.buffer = 0;
@@ -877,11 +879,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.crouching) {
       const want = `${hero}-crouch`;
       if (this.player.anims.currentAnim?.key !== want) this.player.play(want, true);
-      this.player.setDisplaySize(HERO_DISPLAY_W, CROUCH_DISPLAY_H);
     } else {
-      if (Math.abs(this.player.displayHeight - CROUCH_DISPLAY_H) < 2) {
-        this.player.setDisplaySize(HERO_DISPLAY_W, HERO_DISPLAY_H);
-      }
       if (!this.grounded) {
         const want = `${hero}-jump`;
         if (this.player.anims.currentAnim?.key !== want) this.player.play(want, true);
@@ -901,6 +899,7 @@ export class PlayScene extends Phaser.Scene {
     if (wantShoot && this.fireCd <= 0) this.fire();
     if (actions.knifePressed && this.knifeCd <= 0) this.knife();
     if ((actions.grenadePressed || actions.grenadeHeld) && this.grenadeCd <= 0 && this.grenades > 0) this.throwFrag();
+    this.unstickFromSolids();
   }
 
   fire() {
@@ -1622,14 +1621,50 @@ export class PlayScene extends Phaser.Scene {
     });
   }
 
+  unstickFromSolids() {
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    const px = this.player.x;
+    for (const obj of this.solids.getChildren()) {
+      const anyObj = obj as unknown as { getBounds?: () => Phaser.Geom.Rectangle };
+      if (typeof anyObj.getBounds !== "function") continue;
+      const b = anyObj.getBounds();
+      if (px < b.left - 6 || px > b.right + 6) continue;
+      if (body.bottom > b.top + 6 && body.top < b.top + 70) {
+        this.player.y -= body.bottom - b.top;
+        body.velocity.y = 0;
+        this.grounded = true;
+      }
+    }
+  }
+
+  standingOn(group: Phaser.Physics.Arcade.StaticGroup | null) {
+    if (!group) return false;
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    const feetY = body.bottom;
+    const px = this.player.x;
+    return group.getChildren().some((obj) => {
+      const anyObj = obj as unknown as { getBounds?: () => Phaser.Geom.Rectangle };
+      if (typeof anyObj.getBounds !== "function") return false;
+      const b = anyObj.getBounds();
+      return px > b.left - 8 && px < b.right + 8 && Math.abs(feetY - b.top) < 18;
+    });
+  }
+
   applyHeroBox() {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
+    const bottom = body.bottom;
     if (this.crouching) {
+      this.player.setDisplaySize(HERO_DISPLAY_W, CROUCH_DISPLAY_H);
       body.setSize(78, 96);
       body.setOffset((HERO_FRAME - 78) / 2, HERO_FRAME - 104);
     } else {
+      this.player.setDisplaySize(HERO_DISPLAY_W, HERO_DISPLAY_H);
       body.setSize(78, 168);
       body.setOffset((HERO_FRAME - 78) / 2, HERO_FRAME - 176);
+    }
+    if (this.grounded) {
+      this.player.y += bottom - body.bottom;
+      if (body.velocity.y > 0) body.velocity.y = 0;
     }
   }
 
