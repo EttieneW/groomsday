@@ -43,6 +43,9 @@ export const sfx = {
       beep(220 + Math.random() * 40, 0.06, "square", 0.045, -30);
     } else if (kind === "rocket") {
       beep(90, 0.28, "sawtooth", 0.08, 40);
+    } else if (kind === "laser") {
+      beep(880, 0.05, "square", 0.04, 220);
+      beep(1400, 0.04, "sine", 0.03, 0);
     } else {
       beep(420 + Math.random() * 40, 0.07, "square", 0.05, -120);
     }

@@ -51,10 +51,14 @@ Useful scripts:
 | Jump / double-jump | W, Space, or up |
 | Crouch (shoot low) | S or down |
 | Drop through | S + jump |
-| Fire | J, K, Ctrl, Shift, F |
+| Fire | J |
+| Knife | K |
+| Grenade | L |
 | Restart | R after a wipe |
 
 Enemies **telegraph**. Skeletons raise a pistol and flash gold before the bone shot flies. Jump or run past it.
+
+Story: Ivory Hale was stolen from the aisle by Lord Ashcroft Morrow (the Hollow Groom). Mission 1 ends with the Lychwing. The Veil King dies on Mission 10. After each clear, each groomsman picks an upgrade.
 
 ## Stack
 

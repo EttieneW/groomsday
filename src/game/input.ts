@@ -6,6 +6,8 @@ export const touchState = {
   right: false,
   jump: false,
   shoot: false,
+  knife: false,
+  grenade: false,
   down: false,
 };
 
@@ -35,6 +37,8 @@ type SceneKeys = {
   } | null;
   prevJump: boolean;
   prevShoot: boolean;
+  prevKnife: boolean;
+  prevGrenade: boolean;
   prevPause: boolean;
 };
 
@@ -43,9 +47,9 @@ function held(scene: SceneKeys, code: string): boolean {
   return Boolean(scene.keys[code]?.isDown);
 }
 
-function padAxes(): { x: number; jump: boolean; shoot: boolean; down: boolean } {
+function padAxes(): { x: number; jump: boolean; shoot: boolean; knife: boolean; grenade: boolean; down: boolean } {
   if (typeof navigator === "undefined" || !navigator.getGamepads) {
-    return { x: 0, jump: false, shoot: false, down: false };
+    return { x: 0, jump: false, shoot: false, knife: false, grenade: false, down: false };
   }
   const pads = navigator.getGamepads();
   for (const p of pads) {
@@ -62,10 +66,12 @@ function padAxes(): { x: number; jump: boolean; shoot: boolean; down: boolean } 
       x: left && !right ? -1 : right && !left ? 1 : Math.abs(x) > 0.25 ? Math.sign(x) : 0,
       jump: Boolean(p.buttons[0]?.pressed || p.buttons[12]?.pressed),
       shoot: Boolean(p.buttons[2]?.pressed || p.buttons[7]?.pressed || p.buttons[5]?.pressed),
+      knife: Boolean(p.buttons[1]?.pressed),
+      grenade: Boolean(p.buttons[3]?.pressed || p.buttons[4]?.pressed),
       down: Boolean(p.buttons[13]?.pressed || ly > 0.55),
     };
   }
-  return { x: 0, jump: false, shoot: false, down: false };
+  return { x: 0, jump: false, shoot: false, knife: false, grenade: false, down: false };
 }
 
 export function sampleActions(scene: SceneKeys): Actions {
@@ -85,14 +91,9 @@ export function sampleActions(scene: SceneKeys): Actions {
     Boolean(scene.cursors?.up.isDown) ||
     touchState.jump ||
     pad.jump;
-  const shootHeld =
-    held(scene, "J") ||
-    held(scene, "K") ||
-    held(scene, "CTRL") ||
-    held(scene, "SHIFT") ||
-    held(scene, "F") ||
-    touchState.shoot ||
-    pad.shoot;
+  const shootHeld = held(scene, "J") || held(scene, "CTRL") || touchState.shoot || pad.shoot;
+  const knifeHeld = held(scene, "K") || touchState.knife || pad.knife;
+  const grenadeHeld = held(scene, "L") || touchState.grenade || pad.grenade;
   const downHeld =
     held(scene, "S") ||
     held(scene, "C") ||
@@ -103,10 +104,26 @@ export function sampleActions(scene: SceneKeys): Actions {
 
   const jumpPressed = jumpHeld && !scene.prevJump;
   const shootPressed = shootHeld && !scene.prevShoot;
+  const knifePressed = knifeHeld && !scene.prevKnife;
+  const grenadePressed = grenadeHeld && !scene.prevGrenade;
   const pausePressed = pauseHeld && !scene.prevPause;
   scene.prevJump = jumpHeld;
   scene.prevShoot = shootHeld;
+  scene.prevKnife = knifeHeld;
+  scene.prevGrenade = grenadeHeld;
   scene.prevPause = pauseHeld;
 
-  return { moveX, jumpHeld, jumpPressed, down: downHeld, shootHeld, shootPressed, pausePressed };
+  return {
+    moveX,
+    jumpHeld,
+    jumpPressed,
+    down: downHeld,
+    shootHeld,
+    shootPressed,
+    knifeHeld,
+    knifePressed,
+    grenadeHeld,
+    grenadePressed,
+    pausePressed,
+  };
 }

@@ -10,10 +10,15 @@ page.on("console", (m) => {
 });
 
 await page.goto(url, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: /enter the chapel/i }).click();
+await page.getByRole("button", { name: /chapel of the damned/i }).click();
 await page.waitForTimeout(300);
 await page.getByRole("button", { name: /solo raid/i }).click();
-await page.waitForSelector("canvas", { timeout: 8000 });
+await page.waitForTimeout(800);
+for (let i = 0; i < 8; i++) {
+  await page.keyboard.press("KeyJ");
+  await page.waitForTimeout(180);
+}
+await page.waitForSelector("canvas", { timeout: 20000 });
 await page.waitForTimeout(1800);
 
 const canvas = await page.locator("canvas").count();

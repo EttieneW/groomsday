@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CampaignBoard } from "@/components/campaign-board";
+import { MissionIntro } from "@/components/mission-intro";
+import { UpgradeScreen } from "@/components/upgrade-screen";
+import {
+  applyUpgrade,
+  completeMission,
+  loadCampaign,
+  newCampaign,
+  type CampaignSave,
+  type MissionId,
+  type UpgradeId,
+} from "@/game/campaign";
 import { HEROES, HERO_ORDER, type HeroId } from "@/game/constants";
 import { touchState } from "@/game/input";
 import { isNetEvent, isPlayerSnap, isWorldMsg, makeLocalNet } from "@/game/net";
 import type { CreateGameOptions, GameHud, NetBridge, PlayerSnap } from "@/game/types";
 import { useP2PRoom } from "@/lib/multiplayer";
 
-type Screen = "title" | "how" | "select" | "lobby" | "play";
+type Screen = "title" | "how" | "select" | "lobby" | "campaign" | "intro" | "play";
 
 function makeCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -30,6 +42,8 @@ export function GameApp() {
   const [room, setRoom] = useState("");
   const [isHost, setIsHost] = useState(true);
   const [joinInput, setJoinInput] = useState("");
+  const [save, setSave] = useState<CampaignSave>(() => loadCampaign());
+  const [mission, setMission] = useState<MissionId>(1);
 
   useEffect(() => {
     if (invited) {
@@ -41,7 +55,14 @@ export function GameApp() {
   const startSolo = () => {
     setIsHost(true);
     setRoom("");
-    setScreen("play");
+    setMission(1);
+    setScreen("intro");
+  };
+  const playMission = (id: MissionId) => {
+    setIsHost(true);
+    setRoom("");
+    setMission(id);
+    setScreen("select");
   };
   const createSquad = () => {
     const code = makeCode();
@@ -73,6 +94,7 @@ export function GameApp() {
         <TitleScreen
           onRaid={() => setScreen("select")}
           onHow={() => setScreen("how")}
+          onCampaign={() => setScreen("campaign")}
         />
       )}
       {screen === "how" && <HowScreen onBack={() => setScreen("title")} />}
@@ -91,6 +113,17 @@ export function GameApp() {
           onBack={() => setScreen("title")}
         />
       )}
+      {screen === "campaign" && (
+        <CampaignBoard
+          save={save}
+          onPlay={playMission}
+          onNew={() => setSave(newCampaign())}
+          onBack={() => setScreen("title")}
+        />
+      )}
+      {screen === "intro" && (
+        <MissionIntro missionId={mission} onDone={() => setScreen("play")} />
+      )}
       {screen === "lobby" && room && (
         <LobbyScreen
           key={room}
@@ -98,7 +131,7 @@ export function GameApp() {
           name={name}
           hero={hero}
           isHost={isHost}
-          onStart={() => setScreen("play")}
+          onStart={() => setScreen("intro")}
           onBack={() => setScreen("select")}
         />
       )}
@@ -109,26 +142,40 @@ export function GameApp() {
           name={name}
           room={room}
           isHost={isHost}
-          onQuit={() => setScreen(room ? "lobby" : "select")}
+          upgrades={save.upgrades}
+          onQuit={() => setScreen(room ? "lobby" : "campaign")}
+          onUpgraded={(id) => {
+            const next = applyUpgrade(save, id);
+            setSave(completeMission(next, mission));
+            setScreen("campaign");
+          }}
         />
       )}
     </div>
   );
 }
 
-function TitleScreen({ onRaid, onHow }: { onRaid: () => void; onHow: () => void }) {
+function TitleScreen({
+  onRaid,
+  onHow,
+  onCampaign,
+}: {
+  onRaid: () => void;
+  onHow: () => void;
+  onCampaign: () => void;
+}) {
   return (
     <main className="relative z-10 mx-auto flex min-h-dvh max-w-3xl flex-col items-center justify-center px-6 py-12 text-center">
-      <p className="font-mono text-sm tracking-[0.35em] text-muted uppercase">Mission 1</p>
+      <p className="font-mono text-sm tracking-[0.35em] text-muted uppercase">A horror wedding raid</p>
       <h1 className="mt-3 font-display text-5xl leading-none tracking-tight text-bone sm:text-7xl">
         GROOM
         <br />
         FORCE
       </h1>
-      <p className="mt-4 max-w-md text-lg text-muted">Chapel of the Damned</p>
+      <p className="mt-4 max-w-md text-lg text-muted">Ivory is gone. Suit up.</p>
       <p className="mt-6 max-w-lg text-sm leading-relaxed text-subtle">
-        Four groomsmen. One haunted chapel. Run, jump, double-jump, and empty the sidearm into
-        whatever crawled out of the crypt.
+        Stache&apos;s bride was torn from the aisle by Lord Ashcroft Morrow, the Hollow Groom. Ten
+        missions. The Veil King dies at midnight.
       </p>
       <div className="mt-10 flex w-full max-w-sm flex-col gap-3">
         <button
@@ -136,7 +183,14 @@ function TitleScreen({ onRaid, onHow }: { onRaid: () => void; onHow: () => void 
           onClick={onRaid}
           className="rounded-lg bg-accent px-6 py-3.5 text-base font-semibold tracking-wide text-accent-fg transition-transform duration-[var(--motion-quick)] hover:brightness-110 active:scale-[0.98]"
         >
-          Enter the chapel
+          Mission 1 — Chapel of the Damned
+        </button>
+        <button
+          type="button"
+          onClick={onCampaign}
+          className="rounded-lg border border-border bg-surface px-6 py-3.5 text-base font-semibold text-fg transition-colors hover:bg-elevated"
+        >
+          Campaign
         </button>
         <button
           type="button"
@@ -147,7 +201,7 @@ function TitleScreen({ onRaid, onHow }: { onRaid: () => void; onHow: () => void 
         </button>
       </div>
       <p className="mt-10 font-mono text-xs uppercase tracking-widest text-subtle">
-        1–4 players · WASD + fire
+        1–4 players · J fire · K knife · L grenade
       </p>
     </main>
   );
@@ -159,7 +213,9 @@ function HowScreen({ onBack }: { onBack: () => void }) {
     ["Jump / double-jump", "W, Space, or up"],
     ["Crouch / crawl-shoot", "S or down — hold to kneel and fire low"],
     ["Drop through", "S + jump on a thin ledge"],
-    ["Fire", "J, K, Ctrl, Shift, or tap Fire"],
+    ["Fire", "J or tap Fire"],
+    ["Knife", "K — close range, no ammo"],
+    ["Grenade", "L — bounce, boom, 10 to start"],
     ["Dodge", "Watch the gold wind-up, then jump or run past the shot"],
     ["Restart", "R after a wipe"],
     ["Squad", "One host shares the room link — friends open that same URL"],
@@ -176,10 +232,9 @@ function HowScreen({ onBack }: { onBack: () => void }) {
         ))}
       </ul>
       <p className="mt-6 text-sm leading-relaxed text-muted">
-        Grab gold rings, swap guns from crates, tag gravestone checkpoints, and plant the banner at
-        the far altar. Hold S to crouch and shoot the crawlers. Skeletons raise a pistol and flash
-        gold before they fire — jump or drop to dodge the bone shots. Pits and iron spikes send you
-        back to the last stone.
+        Grab gold rings, smash pews and crates, rescue guests (they drop frags), and kill the Lychwing
+        at the far nave. Hold S to crouch-shot crawlers. Enemies gold-flash before they fire — jump the
+        bone. After the chapel, pick speed, damage, health, or quicker guns.
       </p>
       <button
         type="button"
@@ -409,23 +464,49 @@ function PlayScreen({
   name,
   room,
   isHost,
+  upgrades,
   onQuit,
+  onUpgraded,
 }: {
   hero: HeroId;
   name: string;
   room: string;
   isHost: boolean;
+  upgrades: CampaignSave["upgrades"];
   onQuit: () => void;
+  onUpgraded: (id: UpgradeId) => void;
 }) {
   if (room) {
-    return <OnlinePlay hero={hero} name={name} room={room} isHost={isHost} onQuit={onQuit} />;
+    return (
+      <OnlinePlay
+        hero={hero}
+        name={name}
+        room={room}
+        isHost={isHost}
+        upgrades={upgrades}
+        onQuit={onQuit}
+        onUpgraded={onUpgraded}
+      />
+    );
   }
-  return <LocalPlay hero={hero} name={name} onQuit={onQuit} />;
+  return <LocalPlay hero={hero} name={name} upgrades={upgrades} onQuit={onQuit} onUpgraded={onUpgraded} />;
 }
 
-function LocalPlay({ hero, name, onQuit }: { hero: HeroId; name: string; onQuit: () => void }) {
+function LocalPlay({
+  hero,
+  name,
+  upgrades,
+  onQuit,
+  onUpgraded,
+}: {
+  hero: HeroId;
+  name: string;
+  upgrades: CampaignSave["upgrades"];
+  onQuit: () => void;
+  onUpgraded: (id: UpgradeId) => void;
+}) {
   const net = useMemo(() => makeLocalNet(hero, name), [hero, name]);
-  return <MountedGame hero={hero} name={name} net={net} onQuit={onQuit} />;
+  return <MountedGame hero={hero} name={name} net={net} upgrades={upgrades} onQuit={onQuit} onUpgraded={onUpgraded} />;
 }
 
 function OnlinePlay({
@@ -433,13 +514,17 @@ function OnlinePlay({
   name,
   room,
   isHost,
+  upgrades,
   onQuit,
+  onUpgraded,
 }: {
   hero: HeroId;
   name: string;
   room: string;
   isHost: boolean;
+  upgrades: CampaignSave["upgrades"];
   onQuit: () => void;
+  onUpgraded: (id: UpgradeId) => void;
 }) {
   const p2p = useP2PRoom({ room, name: `${name}|${hero}` });
   const remotes = useRef(new Map<string, PlayerSnap>());
@@ -478,19 +563,25 @@ function OnlinePlay({
     net.remotes = remotes.current;
   }, [net, p2p.selfId]);
 
-  return <MountedGame hero={hero} name={name} net={net} onQuit={onQuit} />;
+  return (
+    <MountedGame hero={hero} name={name} net={net} upgrades={upgrades} onQuit={onQuit} onUpgraded={onUpgraded} />
+  );
 }
 
 function MountedGame({
   hero,
   name,
   net,
+  upgrades,
   onQuit,
+  onUpgraded,
 }: {
   hero: HeroId;
   name: string;
   net: NetBridge;
+  upgrades: CampaignSave["upgrades"];
   onQuit: () => void;
+  onUpgraded: (id: UpgradeId) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<GameHud | null>(null);
@@ -513,6 +604,7 @@ function MountedGame({
       hero,
       playerName: name,
       net,
+      upgrades,
       callbacks: {
         onHud: (h) => setHud(h),
         onWin: (c) => setWin(c),
@@ -534,7 +626,7 @@ function MountedGame({
       gone = true;
       game?.destroy(true);
     };
-  }, [hero, name, net]);
+  }, [hero, name, net, upgrades]);
 
   return (
     <div className="flex h-dvh flex-col bg-bg">
@@ -550,19 +642,12 @@ function MountedGame({
           Checkpoint · {toast}
         </div>
       )}
-      {win !== null && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-bg/80 px-6">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 text-center">
-            <p className="font-mono text-xs uppercase tracking-widest text-muted">Mission complete</p>
-            <h3 className="mt-2 font-display text-3xl text-bone">The chapel is clear</h3>
-            <p className="mt-3 text-muted">Rings recovered: {win}</p>
-            <button
-              type="button"
-              onClick={onQuit}
-              className="mt-6 rounded-lg bg-accent px-5 py-3 font-semibold text-accent-fg"
-            >
-              Return
-            </button>
+      {win !== null && <UpgradeScreen stacks={upgrades} waiting={false} onPick={onUpgraded} />}
+      {hud?.bossHp != null && hud.bossMax != null && (
+        <div className="pointer-events-none absolute inset-x-0 top-10 z-10 flex flex-col items-center">
+          <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-accent">{hud.bossName}</p>
+          <div className="mt-1 h-2 w-80 max-w-[70vw] overflow-hidden rounded-full bg-elevated">
+            <div className="h-full bg-danger" style={{ width: `${Math.max(0, (100 * hud.bossHp) / hud.bossMax)}%` }} />
           </div>
         </div>
       )}
@@ -610,8 +695,14 @@ function TouchBar() {
         <button type="button" className={btn} {...bind("jump")}>
           Jump
         </button>
+        <button type="button" className={btn} {...bind("knife")}>
+          Knife
+        </button>
         <button type="button" className={btn} {...bind("shoot")}>
           Fire
+        </button>
+        <button type="button" className={btn} {...bind("grenade")}>
+          Frag
         </button>
       </div>
     </div>

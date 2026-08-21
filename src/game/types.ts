@@ -7,6 +7,10 @@ export type Actions = {
   down: boolean;
   shootHeld: boolean;
   shootPressed: boolean;
+  knifeHeld: boolean;
+  knifePressed: boolean;
+  grenadeHeld: boolean;
+  grenadePressed: boolean;
   pausePressed: boolean;
 };
 
@@ -24,6 +28,7 @@ export type PlayerSnap = {
   maxHp: number;
   weapon: WeaponId;
   ammo: number;
+  grenades: number;
   coins: number;
   alive: boolean;
   invuln: number;
@@ -72,7 +77,11 @@ export type NetEvent =
   | { t: "ck"; x: number }
   | { t: "win" }
   | { t: "restart" }
-  | { t: "eshot"; id: number; x: number; y: number; vx: number; vy: number };
+  | { t: "eshot"; id: number; x: number; y: number; vx: number; vy: number }
+  | { t: "pow"; id: number }
+  | { t: "break"; id: number }
+  | { t: "boss"; hp: number; phase: number }
+  | { t: "upgrade"; pick: string };
 
 export type GameHud = {
   hp: number;
@@ -81,8 +90,14 @@ export type GameHud = {
   teamCoins: number;
   weapon: WeaponId;
   ammo: number;
+  grenades: number;
+  guests: number;
+  guestMax: number;
   lives: number;
   banner: string;
+  bossHp?: number;
+  bossMax?: number;
+  bossName?: string;
 };
 
 export type GameCallbacks = {
@@ -109,4 +124,5 @@ export type CreateGameOptions = {
   playerName: string;
   net: NetBridge;
   callbacks: GameCallbacks;
+  upgrades?: { speed: number; dmg: number; hp: number; gunnery: number };
 };

@@ -1,6 +1,6 @@
 export const W = 1280;
 export const H = 720;
-export const LEVEL_W = 8200;
+export const LEVEL_W = 14000;
 export const LEVEL_H = 720;
 export const GROUND = 640;
 export const TILE = 32;
@@ -36,8 +36,8 @@ export const ENEMY_WINDUP = 0.42;
 export const ENEMY_RECOVER = 0.28;
 
 export type HeroId = "lens" | "goldie" | "bear" | "stache";
-export type WeaponId = "pistol" | "shotgun" | "heavy" | "rocket";
-export type EnemyKind = "skeleton" | "ghost" | "bat";
+export type WeaponId = "pistol" | "shotgun" | "heavy" | "rocket" | "laser";
+export type EnemyKind = "skeleton" | "ghost" | "bat" | "usher" | "bomber" | "gargoyle" | "priest" | "hearse";
 
 export const HEROES: Record<
   HeroId,
@@ -130,19 +130,19 @@ export const WEAPONS: Record<
     spread: 0.32,
     count: 5,
     life: 0.26,
-    ammo: 12,
+    ammo: 30,
     explode: 0,
   },
   heavy: {
     id: "heavy",
     label: "HEAVY",
     cooldown: 0.068,
-    speed: 840,
+    speed: 900,
     damage: 1,
     spread: 0.05,
     count: 1,
     life: 0.75,
-    ammo: 48,
+    ammo: 200,
     explode: 0,
   },
   rocket: {
@@ -154,9 +154,24 @@ export const WEAPONS: Record<
     spread: 0,
     count: 1,
     life: 1.15,
-    ammo: 6,
-    explode: 88,
+    ammo: 12,
+    explode: 96,
+  },
+  laser: {
+    id: "laser",
+    label: "LASER",
+    cooldown: 0.05,
+    speed: 1100,
+    damage: 1,
+    spread: 0,
+    count: 1,
+    life: 0.55,
+    ammo: 200,
+    explode: 0,
   },
 };
+
+export const KNIFE = { cooldown: 0.32, range: 78, damage: 2, life: 0.18 };
+export const FRAG = { cooldown: 0.55, speed: 420, damage: 3, explode: 88, start: 10, cap: 20, life: 1.6 };
 
 export const HERO_ORDER: HeroId[] = ["lens", "goldie", "bear", "stache"];
