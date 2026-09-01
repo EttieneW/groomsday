@@ -1,0 +1,14 @@
+{
+  "id": "groom-force",
+  "name": "Groom Force",
+  "engine": "phaser",
+  "tabs": [
+    { "id": "overview", "label": "Overview", "kind": "overview" },
+    { "id": "spec", "label": "Spec", "kind": "spec" },
+    { "id": "heroes", "label": "Heroes", "kind": "media", "paths": ["public/game/portraits"] },
+    { "id": "missions", "label": "Missions", "kind": "files", "paths": ["src/game/missions"] },
+    { "id": "art", "label": "Art", "kind": "media", "paths": ["public/game/sprites", "public/game/props", "public/game/cinematics", "assets"] },
+    { "id": "audio", "label": "Audio", "kind": "audio", "paths": ["public/game/audio"] },
+    { "id": "steam", "label": "Steam", "kind": "steam" }
+  ]
+}
